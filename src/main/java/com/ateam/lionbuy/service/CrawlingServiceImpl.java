@@ -4,18 +4,36 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
-import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLEncoder;
+import java.util.List;
+import java.util.Map;
 import java.util.Scanner;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import com.ateam.lionbuy.entity.Category;
+import com.ateam.lionbuy.entity.Product;
+import com.ateam.lionbuy.entity.Product_lowprice;
+import com.ateam.lionbuy.entity.Product_mall;
+import com.ateam.lionbuy.repository.CategoryRepository;
+import com.ateam.lionbuy.repository.ProductLowpriceRepository;
+import com.ateam.lionbuy.repository.ProductMallRepository;
+import com.ateam.lionbuy.repository.ProductRepository;
 import com.ateam.lionbuy.service.shopingmall.Mall;
 
 @Service
 public class CrawlingServiceImpl implements CrawlingService{
 
+    @Autowired
+    private ProductRepository pRepository;
+    @Autowired
+    private ProductMallRepository pmRepository;
+    @Autowired
+    private ProductLowpriceRepository plRepository;
+    @Autowired
+    private CategoryRepository cRepository;
 
     @Override
     public String getKeyword(String link) {
@@ -57,7 +75,64 @@ public class CrawlingServiceImpl implements CrawlingService{
                             : httpConn.getErrorStream();
                     Scanner s = new Scanner(responseStream, "UTF-8").useDelimiter("\\A");
                     String response = s.hasNext() ? s.next() : "";
-                    return response;
+
+                    String[] ppc_data = data_preprocessing(response);
+                    String[] data_Arr = new String[10];
+                    for (int i = 0; i < data_Arr.length; i++) {
+                        data_Arr[i] = ppc_data[i];
+                    }
+                    for (int i = 0; i < data_Arr.length; i++) {
+                        if(i == 0) {
+                            String data = data_Arr[i].split("item\":")[1];
+                            Map<String, Object> returnMap = StringToMap(data);
+                            Product product = product_build(returnMap);
+                            pRepository.save(product);
+                            String categories = "";
+                            for (int j = 0; j < 4; j++) {
+                                String col = String.format("category%dName", j);
+                                categories += String.valueOf(returnMap.get(col)) + " ";
+                            }
+                            Category category = category_build(String.valueOf(returnMap.get("productTitle")), categories);
+                            cRepository.save(category);
+                            Product_lowprice lowprice = lowprice_build(returnMap);
+                            plRepository.save(lowprice);
+                        }else {
+                            Map<String, Object> returnMap = StringToMap(data_Arr[i]);
+                            if(returnMap.get("lowMallList") == null) {
+                                Product product = product_build(returnMap);
+                                pRepository.save(product);
+                                String categories = "";
+                                for (int j = 0; j < 4; j++) {
+                                    String col = String.format("category%dName", j);
+                                    categories += String.valueOf(returnMap.get(col)) + " ";
+                                }
+                                Category category = category_build(String.valueOf(returnMap.get("productTitle")), categories);
+                                cRepository.save(category);
+                                Product_lowprice lowprice = lowprice_build(returnMap);
+                                plRepository.save(lowprice);
+                            }else{
+                                Product product = product_build(returnMap);
+                                pRepository.save(product);
+                                String categories = "";
+                                for (int j = 0; j < 4; j++) {
+                                    String col = String.format("category%dName", j);
+                                    categories += String.valueOf(returnMap.get(col)) + " ";
+                                }
+                                Category category = category_build(String.valueOf(returnMap.get("productTitle")), categories);
+                                cRepository.save(category);
+                                Category category2 = category_build(String.valueOf(returnMap.get("productTitle")), String.valueOf(returnMap.get("characterValue")));
+                                cRepository.save(category2);
+                                Product_lowprice lowprice = lowprice_build(returnMap);
+                                plRepository.save(lowprice);
+                                // List<Map<String, Object>> mall_list = (List<Map<String, Object>>) returnMap.get("lowMallList");
+                                // for (int z = 0; z < mall_list.size(); z++) {
+                                //     Product_mall mall = mall_build(mall_list.get(z), String.valueOf(returnMap.get("productTitle")));
+                                //     pmRepository.save(mall);
+                                // }
+                            }
+                        }
+                    }
+                    return "성공!";
             } catch (UnsupportedEncodingException e) {
                 e.printStackTrace();
             }

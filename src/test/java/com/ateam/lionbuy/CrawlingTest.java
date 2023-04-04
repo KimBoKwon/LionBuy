@@ -54,14 +54,7 @@ public class CrawlingTest {
         String[] data_Arr = new String[10];
         for (int i = 0; i < data_Arr.length; i++) {
             data_Arr[i] = list_split_response_Arr[i];
-            File file = new File(String.format("C:/Users/me/Desktop/ateam_project/buyproject/src/test/java/com/ateam/buyproject/test_%d.txt", i));
-            if(!file.exists()) {
-                file.createNewFile();
-            }
-            FileWriter fw = new FileWriter(file);
-            BufferedWriter writer = new BufferedWriter(fw);
-            writer.write(data_Arr[i]);
-            writer.close();
+            
         }
         System.out.println(data_Arr[0]);
         for (int i = 0; i < data_Arr.length; i++) {
@@ -85,7 +78,7 @@ public class CrawlingTest {
     }
 
     //String 객체를 Map타입으로 변환(jackson)
-    public Map<String, Object> jsonToMap(String result) throws IOException {
+    public Map<String, Object> StringToMap(String result) throws IOException {
         ObjectMapper mapper = new ObjectMapper();
         Map<String, Object> returnMap = mapper.readValue(result, Map.class);
         return returnMap;
