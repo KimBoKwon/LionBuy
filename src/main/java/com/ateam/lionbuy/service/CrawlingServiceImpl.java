@@ -31,6 +31,7 @@ import lombok.extern.log4j.Log4j2;
 @Log4j2
 public class CrawlingServiceImpl implements CrawlingService{
 
+    // repository 들을 가져온 부분
     @Autowired
     private ProductRepository pRepository;
     @Autowired
@@ -53,8 +54,13 @@ public class CrawlingServiceImpl implements CrawlingService{
         try {
             String encodedKeyword;
             try {
+                // 가져온 keyword를 인코딩하는 코드
                 encodedKeyword = URLEncoder.encode(keyword, "UTF-8");
+
+                // 우리가 크롤링할 url을 지정하는 코드
                 url = new URL("https://search.shopping.naver.com/search/all?query="+ encodedKeyword +"&cat_id=&frm=NVSHATC");
+
+                // url에 연결하여 요청하는데 필요한 설정(header)값을 지정
                 HttpURLConnection httpConn;
                 try {
                     httpConn = (HttpURLConnection) url.openConnection();
@@ -79,33 +85,61 @@ public class CrawlingServiceImpl implements CrawlingService{
                             ? httpConn.getInputStream()
                             : httpConn.getErrorStream();
                     Scanner s = new Scanner(responseStream, "UTF-8").useDelimiter("\\A");
+                    // 최종적으로 가져온 html 코드를 response 변수에 할당
                     String response = s.hasNext() ? s.next() : "";
-                    fm.file_make(response);
 
+                    // data_preprocessing 메서드를 사용하여 데이터 전처리
+                    // data_preprocessing 메서드는 CrawlingService 클래스에 있음
                     String[] ppc_data = data_preprocessing(response);
+
+                    // 많은 데이터중에 10개만 담을 배열 선언
                     String[] data_Arr = new String[10];
+
+                    // data_Arr 배열에 10개의 데이터를 담는 코드
                     for (int i = 0; i < data_Arr.length; i++) {
                         data_Arr[i] = ppc_data[i];
                     }
+
+                    // 데이터들을 DB에 넣는 과정
                     for (int i = 0; i < data_Arr.length; i++) {
+                        // 첫번째 데이터에는 앞에 item": 가 붙어있어서 제거후 작업
                         if(i == 0) {
+                            // split 함수를 사용하여 제거
                             String data = data_Arr[i].split("item\":")[1];
+
+                            // 가져온 String data 객체를 Map으로 변환하는 과정
+                            // StringToMap 메서드는 CrawlingService 클래스에 있음
                             Map<String, Object> returnMap = StringToMap(data);
+
+                            // Map타입의 데이터를 Entity로 변환하여 디비에 저장하는 코드
+                            // product_build 메서드는 CrawlingService 클래스에 있음
                             Product product = product_build(returnMap);
                             pRepository.save(product);
+
+                            // 데이터에 카테고리가 여러개의 key에 존재하고 있어서 한 String 변수에 뭉쳐서 디비에 넣은 코드
+                            // 데이터에서 category1Name 이런식으로 key가 정의되어 있음
                             String categories = "";
                             for (int j = 0; j < 4; j++) {
                                 String col = String.format("category%dName", j+1);
                                 categories += String.valueOf(returnMap.get(col)) + " ";
                             }
+                            // DB에 넣을 데이터를 Entity에 넣어 디비에 저장
+                            // category_build 메서드는 CrawlingService 클래스에 있음
                             Category category = category_build(String.valueOf(returnMap.get("productTitle")), categories);
                             cRepository.save(category);
+                            Category category2 = category_build(String.valueOf(returnMap.get("productTitle")), String.valueOf(returnMap.get("characterValue")));
+                            cRepository.save(category2);
+
+                            // 최저가 테이블에 최저가 데이터를 넣는 코드
+                            // DB에 넣을 데이터를 Entity에 넣어 디비에 저장
+                            // lowprice_build 메서드는 CrawlingService 클래스에 있음
                             Product_lowprice lowprice = lowprice_build(returnMap);
                             plRepository.save(lowprice);
                         }else {
                             Map<String, Object> returnMap = StringToMap(data_Arr[i]);
+                            // 쇼핑몰리스트의 값이 있는지 없는지의 기준으로 if문을 나누었음
                             if(returnMap.get("lowMallList") == null) {
-                                log.info(">>>" + returnMap.get("lowMallList"));
+                                // 위에 코드와 같다
                                 Product product = product_build(returnMap);
                                 pRepository.save(product);
                                 String categories = "";
@@ -120,6 +154,8 @@ public class CrawlingServiceImpl implements CrawlingService{
                                 Product_lowprice lowprice = lowprice_build(returnMap);
                                 plRepository.save(lowprice);
                             }else{
+                                // 위에 코드와 같으나 차이점이 있다면 요기에 들어오는 데이터들은 쇼핑몰 데이터가 있어서
+                                // product_mall 테이블에 쇼핑몰 데이터를 저장
                                 Product product = product_build(returnMap);
                                 pRepository.save(product);
                                 String categories = "";
@@ -134,6 +170,13 @@ public class CrawlingServiceImpl implements CrawlingService{
                                 cRepository.save(category2);
                                 Product_lowprice lowprice = lowprice_build(returnMap);
                                 plRepository.save(lowprice);
+
+                                // 요부분이 쇼핑몰 데이터를 저장하는 부분
+                                // 쇼핑몰 데이터가 Object 타입으로 되어있지만 실제론 List<Map<String, Object>> 타입으로 되어있다
+                                // 하나 하나 데이터를 따로 넣고 싶어서 ObjectMapper 클래스를 사용하여
+                                // Object를 list로 만들었다
+                                // mall_build_entity 메서드는 넣고 싶은 데이터들을 Entity로 정의하는 메서드 이다
+                                // mall_build_entity 메서드는 CrawlingService 클래스에 있다
                                 ObjectMapper ObjectMapper = new ObjectMapper();
                                 String lowMallStr = ObjectMapper.writeValueAsString(returnMap.get("lowMallList"));
                                 List<Map<String, Object>> lowMallList = ObjectMapper.readValue(lowMallStr, new TypeReference<List<Map<String, Object>>>(){});
