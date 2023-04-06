@@ -7,9 +7,12 @@ import com.ateam.lionbuy.entity.Category;
 import com.ateam.lionbuy.entity.Product;
 import com.ateam.lionbuy.entity.Product_lowprice;
 import com.ateam.lionbuy.entity.Product_mall;
+import com.ateam.lionbuy.util.FileMake;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 public interface CrawlingService {
+
+    FileMake fm = new FileMake();
 
     String getKeyword(String link);
 
@@ -58,14 +61,14 @@ public interface CrawlingService {
         return lowprice;
     }
 
-    default Product_mall mall_build(Map<String, Object> returnmap, String producttitle) {
+    default Product_mall mall_build_entity(Map<String, Object> returnmap, String mall_name, String price) {
         Product product = Product.builder()
             .pd_name(String.valueOf(returnmap.get("productTitle")))
             .build();
         Product_mall mall = Product_mall.builder()
             .product(product)
-            .mall_name(String.valueOf(returnmap.get("chnlName")))
-            .price(String.valueOf(returnmap.get("price")))
+            .mall_name(mall_name)
+            .price(price)
             .build();
         return mall;
     }

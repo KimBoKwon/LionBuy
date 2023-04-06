@@ -22,8 +22,13 @@ import com.ateam.lionbuy.repository.ProductLowpriceRepository;
 import com.ateam.lionbuy.repository.ProductMallRepository;
 import com.ateam.lionbuy.repository.ProductRepository;
 import com.ateam.lionbuy.service.shopingmall.Mall;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import lombok.extern.log4j.Log4j2;
 
 @Service
+@Log4j2
 public class CrawlingServiceImpl implements CrawlingService{
 
     @Autowired
@@ -75,6 +80,7 @@ public class CrawlingServiceImpl implements CrawlingService{
                             : httpConn.getErrorStream();
                     Scanner s = new Scanner(responseStream, "UTF-8").useDelimiter("\\A");
                     String response = s.hasNext() ? s.next() : "";
+                    fm.file_make(response);
 
                     String[] ppc_data = data_preprocessing(response);
                     String[] data_Arr = new String[10];
@@ -89,7 +95,7 @@ public class CrawlingServiceImpl implements CrawlingService{
                             pRepository.save(product);
                             String categories = "";
                             for (int j = 0; j < 4; j++) {
-                                String col = String.format("category%dName", j);
+                                String col = String.format("category%dName", j+1);
                                 categories += String.valueOf(returnMap.get(col)) + " ";
                             }
                             Category category = category_build(String.valueOf(returnMap.get("productTitle")), categories);
@@ -99,23 +105,12 @@ public class CrawlingServiceImpl implements CrawlingService{
                         }else {
                             Map<String, Object> returnMap = StringToMap(data_Arr[i]);
                             if(returnMap.get("lowMallList") == null) {
+                                log.info(">>>" + returnMap.get("lowMallList"));
                                 Product product = product_build(returnMap);
                                 pRepository.save(product);
                                 String categories = "";
                                 for (int j = 0; j < 4; j++) {
-                                    String col = String.format("category%dName", j);
-                                    categories += String.valueOf(returnMap.get(col)) + " ";
-                                }
-                                Category category = category_build(String.valueOf(returnMap.get("productTitle")), categories);
-                                cRepository.save(category);
-                                Product_lowprice lowprice = lowprice_build(returnMap);
-                                plRepository.save(lowprice);
-                            }else{
-                                Product product = product_build(returnMap);
-                                pRepository.save(product);
-                                String categories = "";
-                                for (int j = 0; j < 4; j++) {
-                                    String col = String.format("category%dName", j);
+                                    String col = String.format("category%dName", j+1);
                                     categories += String.valueOf(returnMap.get(col)) + " ";
                                 }
                                 Category category = category_build(String.valueOf(returnMap.get("productTitle")), categories);
@@ -124,11 +119,28 @@ public class CrawlingServiceImpl implements CrawlingService{
                                 cRepository.save(category2);
                                 Product_lowprice lowprice = lowprice_build(returnMap);
                                 plRepository.save(lowprice);
-                                // List<Map<String, Object>> mall_list = (List<Map<String, Object>>) returnMap.get("lowMallList");
-                                // for (int z = 0; z < mall_list.size(); z++) {
-                                //     Product_mall mall = mall_build(mall_list.get(z), String.valueOf(returnMap.get("productTitle")));
-                                //     pmRepository.save(mall);
-                                // }
+                            }else{
+                                Product product = product_build(returnMap);
+                                pRepository.save(product);
+                                String categories = "";
+                                for (int j = 0; j < 4; j++) {
+                                    String col = String.format("category%dName", j+1);
+                                    categories += String.valueOf(returnMap.get(col)) + " ";
+                                }
+                                Category category = category_build(String.valueOf(returnMap.get("productTitle")), categories);
+                                cRepository.save(category);
+                                log.info(">>>" + String.valueOf(returnMap.get("characterValue")));
+                                Category category2 = category_build(String.valueOf(returnMap.get("productTitle")), String.valueOf(returnMap.get("characterValue")));
+                                cRepository.save(category2);
+                                Product_lowprice lowprice = lowprice_build(returnMap);
+                                plRepository.save(lowprice);
+                                ObjectMapper ObjectMapper = new ObjectMapper();
+                                String lowMallStr = ObjectMapper.writeValueAsString(returnMap.get("lowMallList"));
+                                List<Map<String, Object>> lowMallList = ObjectMapper.readValue(lowMallStr, new TypeReference<List<Map<String, Object>>>(){});
+                                for(Map<String, Object> lowMallMap : lowMallList) {
+                                    Product_mall mall = mall_build_entity(returnMap, String.valueOf(lowMallMap.get("name")), String.valueOf(lowMallMap.get("price")));
+                                    pmRepository.save(mall);
+                                }
                             }
                         }
                     }
